@@ -9,14 +9,15 @@ Windows users: make sure perl is installed and is in your system's PATH
 
 ![alt tag](https://github.com/z0on/GO_MWU/blob/master/heats_cc_gomwu.png)
 
-** Note from Stephan Bitterwolf **
-I created the current GitHub FORK to allow parallel processing of the original commands. The original commands would overwrite the same files leading to no output in the end. I've added unique identifiers to these files and the functions that create them. Now the command easily processes as many files as desired and on as many CPU cores as desired. 
-In my use case, I had 16 files that I needed to run. With the parallel adaptation I can run 10 files in the same time it would have taken to run 1.
 
 
 
 Short Guide 
 -----------
+
+** Note from Stephan Bitterwolf **
+I created the current GitHub FORK to allow parallel processing of the original commands. The original commands would overwrite the same files leading to no output in the end. I've added unique identifiers to these files and the functions that create them. Now the command easily processes as many files as desired and on as many CPU cores as desired. 
+In my use case, I had 16 files that I needed to run. With the parallel adaptation I can run 10 files in the same time it would have taken to run 1.
 
 1. Put all this into the same directory:
 	- scripts: GO_MWU_Parallel.R, gomwu_a.pl, gomwu_b.pl, gomwu.functions.R
