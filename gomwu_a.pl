@@ -4,8 +4,8 @@ my $usage= "
 
 gomwu_a.pl  (v. Feb 2015):
 
-This is the fist script in the GO database slimming and reformatting procedure,
-called automatically by goStats.R 
+This is the first script in the GO database slimming and reformatting procedure,
+called automatically by goStats.R
 
 See README_GO_MWU.txt file for details.
 
@@ -13,7 +13,7 @@ Mikhail Matz, UT Austin; matz@utexas.edu
 
 ";
 
-print "@ARGV";
+print "@ARGV\n"; # Print the arguments.  Helpful for debugging.
 
 my $onto=$ARGV[0] or die $usage;
 my $gen2go=$ARGV[1] or die $usage;
@@ -30,14 +30,19 @@ if ("@ARGV"=~/cutHeight=(\S+)/) { $cutHeight=$1; }
 my $padj="BH";
 if ("@ARGV"=~/p.adjust=(\w+)/) { $padj=$1; }
 
+# Get the unique ID from the command line arguments
+my $unique_id = "";
+if ("@ARGV" =~ /uniqueID=(\S+)/) { $unique_id = $1; }
+
 
 print "
 
 Run parameters:
 
 largest GO category as fraction of all genes (largest)  : $toomany
-         smallest GO category as # of genes (smallest)  : $mingenes
-                clustering threshold (clusterCutHeight) : $cutHeight
+                       smallest GO category as # of genes (smallest)  : $mingenes
+                              clustering threshold (clusterCutHeight) : $cutHeight
+                                                           unique ID : $unique_id
 
 ";
 
@@ -49,8 +54,11 @@ else { die "unrecognized division: $div\n";}
 
 my $inname2=$measure.".".$div.".tmp";
 my $inname3=$div."_".$measure;
+# Use the unique ID in the filename
 my $inname31="dissim0_".$div."_".$gen2go;
+$inname31 .= "_" . $unique_id if $unique_id; # Corrected line
 my $inname4="dissim_".$div."_".$measure."_".$gen2go;
+
 
 my @donealready=();
 
@@ -108,14 +116,14 @@ foreach $term (keys %parents) {
 		$golevel{$term}++;
 		$tstart=$in-$extra+1;
 		$extra=0;
-		for ($tt=$tstart; $tt<=$in;$tt++){ 
+		for ($tt=$tstart; $tt<=$in;$tt++){
 			$t=${$parents{$term}}[$tt];
 			foreach $t0 (@{$parents{$t}}) {
 				next if ("@{$parents{$term}}"=~/$t0/ || !$goodterms{$t0});
 				push @{$parents{$term}}, $t0;
 				$extra++;
 			}
-		}	
+		}
 	}
 }
 ###################################################
@@ -185,14 +193,14 @@ $ncoll=$#collect+1;
 #print "collected terms: $ncoll\n";
 
 	my @nrcollect;
-	foreach $term (@collect) { 
+	foreach $term (@collect) {
 		push @nrcollect, $term unless ("@nrcollect"=~/$term/);
 	}
 
 $ncoll=$#nrcollect+1;
-#print "       nr terms: $ncoll\n";
+#print "       nr terms: $ncoll\n";
 	
-	foreach $term (@nrcollect) { 
+	foreach $term (@nrcollect) {
 		print {VOOL} "\"$name{$term}\"\t$term\t$golevel{$term}\t$dnds{$seq}\t$seq\n";
 	}
 }
@@ -208,7 +216,7 @@ my %goodterms;
 close VOOL;
 #########################
 # selecting good sized categroies, collapsing redundant ones
-#if($dones!~/ $inname3 /) { 
+#if($dones!~/ $inname3 /) { 
 open TAB, $inname2 or die "go_nrify: cannot open input table $inname2\n";
 <TAB>;
 
@@ -216,7 +224,7 @@ my %level={};
 my %desc={};
 my %value={};
 my $des;
-my $go; 
+my $go;
 my $l;
 my $gn;
 my $val;
@@ -250,21 +258,21 @@ $gc=$#gcount+1;
 $goc=$#gos+1;
 print "-------------\ngo_nrify:\n$goc categories, $gc genes; size range $mingenes-",$gc*$toomany,"\n";
 
-# excluding too large and  too small categories
+# excluding too large and  too small categories
 my %gonego={};
 my $toobroad=0;
 my $toosmall=0;
 for ($g1=0;$g1<=$#gos;$g1++){
 	$go=@gos[$g1];
 	my $golen=$#{$genes{$go}}+1;
-	if ($golen > $gc*$toomany) { 
+	if ($golen > $gc*$toomany) {
 		unless ($go eq "unknown") {
 			$gonego{$go}=1;
 			$toobroad++;
 		}
 #warn "$go: too broad ($golen genes)\n";
 	}
-	elsif ($golen < $mingenes) { 
+	elsif ($golen < $mingenes) {
 		$gonego{$go}=1 ;
 		$toosmall++;
 #warn "\t\t$go: too narrow ($golen genes) @{$genes{$go}}\n";
@@ -282,15 +290,15 @@ foreach $go (@gos) { push @goodgo, $go unless ($gonego{$go}==1); }
 
 ################################
 
-	#warn "comparing categories...\n"; 
+	#warn "comparing categories...\n"; 
 #my $clfile="cl_".$inname31;
-#if($dones!~/ $clfile /) { 
+#if($dones!~/ $clfile /) { 
 
 	use List::Util qw[min max];
 	for ($g1=0;$g1<=$#gos;$g1++){
 		my $go=@gos[$g1];
 		next if ($gonego{$go}==1);
-	#warn "----------------\n$go  $desc{$go}  level $level{$go}\n";
+	#warn "----------------\n$go  $desc{$go}  level $level{$go}\n";
 		my $goos=$go;
 		my $lev=$level{$go};
 		my $dsc=$desc{$go};
@@ -298,7 +306,7 @@ foreach $go (@gos) { push @goodgo, $go unless ($gonego{$go}==1); }
 			my $go2=@gos[$g2];	
 			next if ($gonego{$go2}==1);
 			next if ($ggi{$go2}==1);
-			my %seen={}; 
+			my %seen={};
 			my $count=0;
 			my @combo=();
 			if ($lump<=1) {
@@ -317,7 +325,7 @@ foreach $go (@gos) { push @goodgo, $go unless ($gonego{$go}==1); }
 	}
 
 	open OUT, ">$inname31" or die "gomwu_b: cannot create output $inname31\n";
-	
+
 	print {OUT} join("\t",@gos),"\n";
 
 	foreach $go (@gos) {
@@ -331,11 +339,6 @@ foreach $go (@gos) { push @goodgo, $go unless ($gonego{$go}==1); }
 	close OUT;
 #}
 
-#print "calling clusteringGOs.R script ....\n";
-#	my $err=`Rscript clusteringGOs.R $inname31 $cutHeight `;
-#	print $err;
-
-
-
-
-
+#print "calling clusteringGOs.R script ....\n";  # This line is no longer needed
+#   my $err=`Rscript clusteringGOs.R $inname31 $cutHeight `; # This line is no longer needed
+#   print $err;  # This line is no longer needed
