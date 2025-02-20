@@ -16,8 +16,10 @@ Mikhail Matz, UT Austin; matz@utexas.edu
 my $gen2go=shift;
 my $measure=shift;
 my $div=shift or die "$usage\nNot enough arguments for gomwu_b.pl\n";
+my $unique_id = shift;  # Get the unique ID as the fourth argument.
 
 my $clfile="cl_dissim0_".$div."_".$gen2go; 
+$clfile .= "_" . $unique_id if $unique_id; # Corrected line
 open CLF, $clfile or die "cannot locate primary clustering file $clfile\n";
 my %clgo={};
 my $go;
@@ -31,7 +33,11 @@ while(<CLF>){
 close CLF;
 
 unlink $clfile;
-unlink "dissim0_".$div."_".$gen2go; 
+
+my $inname31="dissim0_".$div."_".$gen2go;
+$inname31 .= "_" . $unique_id if $unique_id; # Corrected line
+
+unlink $inname31;
 
 opendir THISDIR, ".";
 my @donealready=grep /$gen2go/, readdir THISDIR;
