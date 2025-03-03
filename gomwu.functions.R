@@ -1,3 +1,128 @@
+extract_representative_GOs <- function(results, goDivision, input, gomwu_dir, 
+                                       pcut = 1e-2, hcut = 0.9, plot_tree = FALSE) {
+  message("\n--- Extracting Representative GO Terms ---\n")
+  
+  # Set working directory to the GO-MWU directory
+  if (!dir.exists(gomwu_dir)) {
+    stop("Error: The specified GO-MWU directory does not exist.")
+  }
+  setwd(gomwu_dir)
+  message("Working directory changed to: ", getwd())
+  
+  # Check that results contains the required 'goods' component and that it has a 'rawp' column
+  if (!("goods" %in% names(results))) {
+    stop("Error: The results object must contain a 'goods' element.")
+  }
+  if (!("rawp" %in% colnames(results$goods))) {
+    stop("Error: The 'goods' element must contain a 'rawp' column.")
+  }
+  
+  # Initialize annotation storage
+  annots <- c()
+  num_terms <- nrow(results$goods)
+  
+  if (num_terms > 1) {
+    if ("hcl" %in% names(results)) {
+      # Check if the hcl object has enough leaves to form a dendrogram
+      if (length(results$hcl$order) < 3) {
+        message("Too few terms in hcl for clustering/plotting; selecting all terms passing significance filter.")
+        significant_indices <- which(results$goods$rawp <= pcut)
+        if (length(significant_indices) > 0) {
+          annots <- sub("\\d+/\\d+ ", "", rownames(results$goods)[significant_indices])
+        }
+      } else {
+        # Valid hcl available: cut the tree
+        ct <- tryCatch({
+          cutree(results$hcl, h = hcut)
+        }, error = function(e) {
+          message("Error cutting dendrogram for ", input, ": ", e$message)
+          return(NULL)
+        })
+        
+        if (is.null(ct)) {
+          message("Dendrogram issues for ", input, "; selecting all terms passing significance filter.")
+          significant_indices <- which(results$goods$rawp <= pcut)
+          if (length(significant_indices) > 0) {
+            annots <- sub("\\d+/\\d+ ", "", rownames(results$goods)[significant_indices])
+          }
+        } else {
+          # Optionally plot the dendrogram if requested
+          if (plot_tree) {
+            plot_title <- gsub("\\.csv$", "", input)
+            if (length(results$hcl$order) >= 3) {
+              tryCatch({
+                plot(results$hcl, cex = 0.6, main = plot_title)
+                abline(h = hcut, col = "red")
+              }, error = function(e) {
+                message("Error plotting dendrogram for ", input, ": ", e$message)
+              })
+            } else {
+              message("Not enough elements to plot dendrogram for ", input, "; skipping plot.")
+            }
+          }
+          
+          # Process clusters from the cut tree
+          for (ci in unique(ct)) {
+            message("Processing Cluster: ", ci)
+            rn <- names(ct)[ct == ci]  # Terms in this cluster
+            obs <- grep("obsolete", rn)  # Exclude obsolete terms
+            if (length(obs) > 0) rn <- rn[-obs]
+            if (length(rn) == 0) next  # Skip empty clusters
+            
+            rr <- results$goods[rn, , drop = FALSE]
+            bestrr <- rr[which(rr$rawp == min(rr$rawp, na.rm = TRUE)), , drop = FALSE]
+            best <- 1
+            
+            # If there are ties, break them using a frequency-based selection
+            if (nrow(bestrr) > 1) {
+              nns <- sub(" .+", "", row.names(bestrr))
+              fr <- numeric(0)
+              for (i in seq_along(nns)) {
+                fr <- c(fr, eval(parse(text = nns[i])))
+              }
+              best <- which(fr == max(fr))[1]
+            }
+            
+            if (!is.na(bestrr$rawp[best]) && bestrr$rawp[best] <= pcut) {
+              annots <- c(annots, sub("\\d+/\\d+ ", "", row.names(bestrr)[best]))
+            }
+          }
+        }
+      }
+    } else {
+      # No hcl element present: fall back to selecting overall best GO term
+      message("No hcl element present for ", input, "; selecting overall best GO term.")
+      best_index <- which.min(results$goods$rawp)
+      if (results$goods$rawp[best_index] <= pcut) {
+        annots <- sub("\\d+/\\d+ ", "", rownames(results$goods)[best_index])
+      }
+    }
+  } else if (num_terms == 1) {
+    # Single-term case: process without clustering
+    message("Only one term is differentially regulated; skipping tree clustering for ", input, ".")
+    single_rawp <- results$goods[1, "rawp"]
+    if (!is.na(single_rawp) && length(single_rawp) > 0 && single_rawp <= pcut) {
+      term_name <- rownames(results$goods)[1]
+      if (is.null(term_name) || term_name == "") term_name <- "term1"
+      annots <- sub("\\d+/\\d+ ", "", term_name)
+    }
+  } else {
+    stop("Error: No terms available in the 'goods' element.")
+  }
+  
+  # Load the MWU file and filter the results based on selected annotations
+  mwus_file <- paste("MWU", goDivision, input, sep = "_")
+  if (!file.exists(mwus_file)) {
+    stop("Error: MWU file not found in the specified directory: ", mwus_file)
+  }
+  
+  mwus <- read.table(mwus_file, header = TRUE)
+  bestGOs <- mwus[mwus$name %in% annots, ]
+  
+  message("\nRepresentative GO extraction complete for ", input, ".\n")
+  return(bestGOs)
+}
+#-----
 clusteringGOs <- function(goAnnotations, goDivision, clusterCutHeight, uniqueID = "") {
   
   inname <- paste0("dissim0_", goDivision, "_", goAnnotations)
