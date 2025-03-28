@@ -32,7 +32,7 @@ plot_gomwu_trees <- function(
   # --- Derive a default output name if not provided ---
   #     Remove '.csv' from inFile and use that as the base.
   outNameBase <- if (is.null(name)) {
-    gsub("\\.csv$", "", basename(inFile))
+    paste(gsub("\\.csv$", "", basename(inFile)), goDivision, sep = "_")
   } else {
     name
   }
