@@ -1,3 +1,144 @@
+plot_gomwu_trees <- function(
+  n,
+  gomwu_plot_list,
+  files_to_plot,
+  goDivision,
+  pcut = 0.05,
+  hcut = 0.9,
+  plot_tree = TRUE,
+  tree_width = 5,
+  gomwu_dir,
+  # Plot saving parameters
+  width = 7,
+  height = 10,
+  dpi = 300,
+  filetype = "png",
+  name = NULL
+) {
+  # --- Load required libraries (if not already loaded) ---
+  # library(dplyr)
+  # library(tidyr)
+  # library(ape)
+  # library(dendextend)
+  # library(ggtree)
+
+  # --- Extract relevant data from the provided lists ---
+  plot_data   <- gomwu_plot_list[[n]]
+  good_genes  <- plot_data$goods
+  hcl         <- plot_data$hcl
+  inFile      <- files_to_plot[n]
+  passing_genes <- plot_data$passing_genes
+  
+  # --- Derive a default output name if not provided ---
+  #     Remove '.csv' from inFile and use that as the base.
+  outNameBase <- if (is.null(name)) {
+    gsub("\\.csv$", "", basename(inFile))
+  } else {
+    name
+  }
+
+  # --- Call the function to get representative GOs (assumes it’s defined elsewhere) ---
+  representative_gos <- extract_representative_GOs(
+    results    = plot_data,
+    goDivision = goDivision,
+    input      = inFile,
+    gomwu_dir  = gomwu_dir,
+    pcut       = pcut,
+    hcut       = hcut,
+    plot_tree  = plot_tree
+  )
+  
+  # --- Convert hierarchical cluster (HCL) object to a 'phylo' tree ---
+  phy_goods <- as.phylo(hcl)
+  
+  # --- Prepare metadata for plotting ---
+  #     Join rownames as 'label' and create a 'fontface' column based on 'sig_cat'.
+  goods_mod <- good_genes %>%
+    dplyr::select(-label) %>%      # remove existing 'label' if present
+    tibble::rownames_to_column(var = "label") %>%
+    dplyr::mutate(
+      fontface = dplyr::case_when(
+        sig_cat == "p < 0.01" ~ "bold",
+        sig_cat == "p < 0.05" ~ "plain",
+        sig_cat == "p < 0.1"  ~ "italic"
+      )
+    )
+  
+  # --- Plot: Full (Original) GO Tree ---
+  p <- ggtree(phy_goods) %<+% goods_mod +
+    geom_tiplab(aes(color = direction_factor, fontface = fontface, size = sig_cat)) +
+    scale_size_manual(
+      name   = "Significance",
+      values = c("p < 0.01" = 4, "p < 0.05" = 3, "p < 0.1" = 3)
+    ) +
+    scale_color_manual(
+      name   = "Direction",
+      values = c("down" = "blue", "up" = "red")
+    ) +
+    coord_cartesian(xlim = c(0, tree_width), clip = "off") +
+    theme(legend.position = "right")
+  
+  # Save the full tree if requested
+  if (plot_tree) {
+    ggsave(
+      filename = file.path(gomwu_dir, paste0(outNameBase, "_full.", filetype)),
+      plot     = p,
+      width    = width,
+      height   = height,
+      dpi      = dpi
+    )
+  }
+  
+  # --- Plot: Reduced (Pruned) GO Tree ---
+  #     Identify final labels from representative GOs, then drop unused tips in the phylo tree.
+  finalLabels <- representative_gos %>%
+    dplyr::left_join(good_genes, by = c("term" = "original_term")) %>%
+    dplyr::pull(label)
+  
+  phy_goods_pruned <- drop.tip(phy_goods, setdiff(phy_goods$tip.label, finalLabels))
+  goods_mod_pruned <- goods_mod %>%
+    dplyr::filter(label %in% finalLabels)
+  
+  p_pruned <- ggtree(phy_goods_pruned) %<+% goods_mod_pruned +
+    geom_tiplab(aes(color = direction_factor, fontface = fontface, size = sig_cat)) +
+    scale_size_manual(
+      name   = "Significance",
+      values = c("p < 0.01" = 4, "p < 0.05" = 3, "p < 0.1" = 3)
+    ) +
+    scale_color_manual(
+      name   = "Direction",
+      values = c("down" = "blue", "up" = "red")
+    ) +
+    coord_cartesian(xlim = c(0, tree_width), clip = "off") +
+    theme(legend.position = "right")
+  
+  # Save the reduced tree if requested
+  if (plot_tree) {
+    ggsave(
+      filename = file.path(gomwu_dir, paste0(outNameBase, "_reduced.", filetype)),
+      plot     = p_pruned,
+      width    = width,
+      height   = height,
+      dpi      = dpi
+    )
+  }
+  
+  # --- Print the plots to the current device (so they appear in e.g. RStudio’s plots pane) ---
+  print(p)
+  print(p_pruned)
+  
+  # --- Return additional objects invisibly ---
+  invisible(list(
+    representative_gos = representative_gos,
+    passing_genes      = passing_genes,
+    plot_data          = plot_data,
+    good_genes         = good_genes,
+    hcl                = hcl,
+    goods_mod_pruned   = goods_mod_pruned,
+    finalLabels        = finalLabels
+  ))
+}
+
 extract_representative_GOs <- function(results, goDivision, input, gomwu_dir, 
                                        pcut = 1e-2, hcut = 0.9, plot_tree = FALSE) {
   message("\n--- Extracting Representative GO Terms ---\n")
