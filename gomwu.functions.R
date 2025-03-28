@@ -135,7 +135,9 @@ plot_gomwu_trees <- function(
     good_genes         = good_genes,
     hcl                = hcl,
     goods_mod_pruned   = goods_mod_pruned,
-    finalLabels        = finalLabels
+    finalLabels        = finalLabels,
+    original_tree      = p,
+    reduced_tree       = p_pruned
   ))
 }
 
