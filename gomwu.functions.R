@@ -8,6 +8,7 @@ plot_gomwu_trees <- function(
   plot_tree = TRUE,
   tree_width = 5,
   gomwu_dir,
+  is_WGCNA = FALSE,
   # Plot saving parameters
   width = 7,
   height = 10,
@@ -15,13 +16,6 @@ plot_gomwu_trees <- function(
   filetype = "png",
   name = NULL
 ) {
-  # --- Load required libraries (if not already loaded) ---
-  # library(dplyr)
-  # library(tidyr)
-  # library(ape)
-  # library(dendextend)
-  # library(ggtree)
-
   # --- Extract relevant data from the provided lists ---
   plot_data   <- gomwu_plot_list[[n]]
   good_genes  <- plot_data$goods
@@ -30,13 +24,12 @@ plot_gomwu_trees <- function(
   passing_genes <- plot_data$passing_genes
   
   # --- Derive a default output name if not provided ---
-  #     Remove '.csv' from inFile and use that as the base.
   outNameBase <- if (is.null(name)) {
     paste(gsub("\\.csv$", "", basename(inFile)), goDivision, sep = "_")
   } else {
     name
   }
-
+  
   # --- Call the function to get representative GOs (assumes it’s defined elsewhere) ---
   representative_gos <- extract_representative_GOs(
     results    = plot_data,
@@ -52,7 +45,6 @@ plot_gomwu_trees <- function(
   phy_goods <- as.phylo(hcl)
   
   # --- Prepare metadata for plotting ---
-  #     Join rownames as 'label' and create a 'fontface' column based on 'sig_cat'.
   goods_mod <- good_genes %>%
     dplyr::select(-label) %>%      # remove existing 'label' if present
     tibble::rownames_to_column(var = "label") %>%
@@ -65,18 +57,29 @@ plot_gomwu_trees <- function(
     )
   
   # --- Plot: Full (Original) GO Tree ---
-  p <- ggtree(phy_goods) %<+% goods_mod +
-    geom_tiplab(aes(color = direction_factor, fontface = fontface, size = sig_cat)) +
-    scale_size_manual(
-      name   = "Significance",
-      values = c("p < 0.01" = 4, "p < 0.05" = 3, "p < 0.1" = 3)
-    ) +
-    scale_color_manual(
-      name   = "Direction",
-      values = c("down" = "blue", "up" = "red")
-    ) +
-    coord_cartesian(xlim = c(0, tree_width), clip = "off") +
-    theme(legend.position = "right")
+  if (is_WGCNA) {
+    p <- ggtree(phy_goods) %<+% goods_mod +
+      geom_tiplab(aes(fontface = fontface, size = sig_cat), color = "black") +
+      scale_size_manual(
+        name   = "Significance",
+        values = c("p < 0.01" = 4, "p < 0.05" = 3, "p < 0.1" = 3)
+      ) +
+      coord_cartesian(xlim = c(0, tree_width), clip = "off") +
+      theme(legend.position = "right")
+  } else {
+    p <- ggtree(phy_goods) %<+% goods_mod +
+      geom_tiplab(aes(color = direction_factor, fontface = fontface, size = sig_cat)) +
+      scale_size_manual(
+        name   = "Significance",
+        values = c("p < 0.01" = 4, "p < 0.05" = 3, "p < 0.1" = 3)
+      ) +
+      scale_color_manual(
+        name   = "Direction",
+        values = c("down" = "blue", "up" = "red")
+      ) +
+      coord_cartesian(xlim = c(0, tree_width), clip = "off") +
+      theme(legend.position = "right")
+  }
   
   # Save the full tree if requested
   if (plot_tree) {
@@ -90,7 +93,6 @@ plot_gomwu_trees <- function(
   }
   
   # --- Plot: Reduced (Pruned) GO Tree ---
-  #     Identify final labels from representative GOs, then drop unused tips in the phylo tree.
   finalLabels <- representative_gos %>%
     dplyr::left_join(good_genes, by = c("term" = "original_term")) %>%
     dplyr::pull(label)
@@ -99,18 +101,29 @@ plot_gomwu_trees <- function(
   goods_mod_pruned <- goods_mod %>%
     dplyr::filter(label %in% finalLabels)
   
-  p_pruned <- ggtree(phy_goods_pruned) %<+% goods_mod_pruned +
-    geom_tiplab(aes(color = direction_factor, fontface = fontface, size = sig_cat)) +
-    scale_size_manual(
-      name   = "Significance",
-      values = c("p < 0.01" = 4, "p < 0.05" = 3, "p < 0.1" = 3)
-    ) +
-    scale_color_manual(
-      name   = "Direction",
-      values = c("down" = "blue", "up" = "red")
-    ) +
-    coord_cartesian(xlim = c(0, tree_width), clip = "off") +
-    theme(legend.position = "right")
+  if (is_WGCNA) {
+    p_pruned <- ggtree(phy_goods_pruned) %<+% goods_mod_pruned +
+      geom_tiplab(aes(fontface = fontface, size = sig_cat), color = "black") +
+      scale_size_manual(
+        name   = "Significance",
+        values = c("p < 0.01" = 4, "p < 0.05" = 3, "p < 0.1" = 3)
+      ) +
+      coord_cartesian(xlim = c(0, tree_width), clip = "off") +
+      theme(legend.position = "right")
+  } else {
+    p_pruned <- ggtree(phy_goods_pruned) %<+% goods_mod_pruned +
+      geom_tiplab(aes(color = direction_factor, fontface = fontface, size = sig_cat)) +
+      scale_size_manual(
+        name   = "Significance",
+        values = c("p < 0.01" = 4, "p < 0.05" = 3, "p < 0.1" = 3)
+      ) +
+      scale_color_manual(
+        name   = "Direction",
+        values = c("down" = "blue", "up" = "red")
+      ) +
+      coord_cartesian(xlim = c(0, tree_width), clip = "off") +
+      theme(legend.position = "right")
+  }
   
   # Save the reduced tree if requested
   if (plot_tree) {
@@ -123,7 +136,7 @@ plot_gomwu_trees <- function(
     )
   }
   
-  # --- Print the plots to the current device (so they appear in e.g. RStudio’s plots pane) ---
+  # --- Print the plots to the current device ---
   print(p)
   print(p_pruned)
   
